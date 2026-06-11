@@ -1,0 +1,467 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  role         String   @default("admin")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String    @unique
+  position  Int       @default(0)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  products  Product[]
+  combos    Combo[]
+
+  @@map("categories")
+}
+
+// unitType: kg | g | unit | portion (porcao/recipiente)
+model Product {
+  id            String   @id @default(uuid())
+  categoryId    String   @map("category_id")
+  name          String
+  description   String?
+  unitType      String   @map("unit_type")
+  weightGrams   Int?     @map("weight_grams")
+  price         Decimal  @db.Decimal(10, 2)
+  stockQty      Decimal  @default(0) @map("stock_qty") @db.Decimal(10, 3)
+  minStock      Decimal  @default(0) @map("min_stock") @db.Decimal(10, 3)
+  isPreCut      Boolean  @default(true) @map("is_pre_cut")
+  imageUrl      String?  @map("image_url")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  category      Category       @relation(fields: [categoryId], references: [id])
+  comboItems    ComboItem[]
+  orderItems    OrderItem[]
+  stockMovements StockMovement[]
+  recipes       Recipe[]
+
+  @@index([categoryId])
+  @@map("products")
+}
+
+model Combo {
+  id          String      @id @default(uuid())
+  categoryId  String?     @map("category_id")
+  name        String
+  description String?
+  servesPeople Int?       @map("serves_people")
+  weightLabel String?     @map("weight_label")
+  price       Decimal     @db.Decimal(10, 2)
+  imageUrl    String?     @map("image_url")
+  active      Boolean     @default(true)
+  featured    Boolean     @default(false)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  category    Category?   @relation(fields: [categoryId], references: [id])
+  items       ComboItem[]
+  orderItems  OrderItem[]
+  recipes     Recipe[]
+
+  @@map("combos")
+}
+
+model ComboItem {
+  id          String  @id @default(uuid())
+  comboId     String  @map("combo_id")
+  productId   String? @map("product_id")
+  itemName    String  @map("item_name")
+  quantity    Decimal @db.Decimal(10, 3)
+  unitLabel   String  @map("unit_label")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  combo   Combo    @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([comboId])
+  @@map("combo_items")
+}
+
+// Entregas 2x por semana (ex: terca e sexta)
+model DeliveryWindow {
+  id             String   @id @default(uuid())
+  label          String
+  weekday        Int
+  cutoffWeekday  Int      @map("cutoff_weekday")
+  cutoffHour     Int      @default(18) @map("cutoff_hour")
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  orders Order[]
+  productionPlans ProductionPlan[]
+
+  @@map("delivery_windows")
+}
+
+// status: draft | finalized
+model ProductionPlan {
+  id               String   @id @default(uuid())
+  deliveryWindowId String   @map("delivery_window_id")
+  deliveryDate     DateTime @map("delivery_date") @db.Date
+  status           String   @default("draft")
+  ordersCount      Int      @default(0) @map("orders_count")
+  cutoffAt         DateTime? @map("cutoff_at")
+  warningsJson     Json?    @map("warnings_json")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  deliveryWindow DeliveryWindow              @relation(fields: [deliveryWindowId], references: [id])
+  outputs        ProductionPlanOutput[]
+  ingredients    ProductionPlanIngredient[]
+  packaging      ProductionPlanPackaging[]
+
+  @@unique([deliveryWindowId, deliveryDate])
+  @@index([deliveryDate])
+  @@map("production_plans")
+}
+
+model ProductionPlanOutput {
+  id        String  @id @default(uuid())
+  planId    String  @map("plan_id")
+  recipeId  String? @map("recipe_id")
+  comboId   String? @map("combo_id")
+  productId String? @map("product_id")
+  itemName  String  @map("item_name")
+  quantity  Decimal @db.Decimal(10, 3)
+
+  plan ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@map("production_plan_outputs")
+}
+
+model ProductionPlanIngredient {
+  id                 String @id @default(uuid())
+  planId             String @map("plan_id")
+  ingredientId       String @map("ingredient_id")
+  netGramsNeeded     Int    @map("net_grams_needed")
+  grossGramsNeeded   Int    @map("gross_grams_needed")
+  stockNetGrams      Int    @map("stock_net_grams")
+  purchaseGrossGrams Int    @map("purchase_gross_grams")
+
+  plan       ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  ingredient Ingredient     @relation(fields: [ingredientId], references: [id])
+
+  @@index([planId])
+  @@map("production_plan_ingredients")
+}
+
+model ProductionPlanPackaging {
+  id          String @id @default(uuid())
+  planId      String @map("plan_id")
+  packagingId String @map("packaging_id")
+  quantity    Int
+
+  plan      ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  packaging Packaging      @relation(fields: [packagingId], references: [id])
+
+  @@index([planId])
+  @@map("production_plan_packaging")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  orders    Order[]
+
+  @@map("customers")
+}
+
+model Order {
+  id               String   @id @default(uuid())
+  customerId       String   @map("customer_id")
+  deliveryWindowId String   @map("delivery_window_id")
+  deliveryDate     DateTime @map("delivery_date") @db.Date
+  status           String   @default("pending")
+  subtotal         Decimal  @default(0) @db.Decimal(10, 2)
+  deliveryFee      Decimal  @default(0) @map("delivery_fee") @db.Decimal(10, 2)
+  discount         Decimal  @default(0) @db.Decimal(10, 2)
+  total            Decimal  @default(0) @db.Decimal(10, 2)
+  addressJson      Json     @map("address_json")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  deliveryWindow DeliveryWindow @relation(fields: [deliveryWindowId], references: [id])
+  items          OrderItem[]
+  payments       Payment[]
+  statusHistory  OrderStatusHistory[]
+
+  @@index([status])
+  @@index([deliveryDate])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  orderId    String  @map("order_id")
+  productId  String? @map("product_id")
+  comboId    String? @map("combo_id")
+  itemName   String  @map("item_name")
+  quantity   Decimal @db.Decimal(10, 3)
+  unitLabel  String  @map("unit_label")
+  unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
+  lineTotal  Decimal @map("line_total") @db.Decimal(10, 2)
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+  combo   Combo?   @relation(fields: [comboId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  oldStatus String?  @map("old_status")
+  newStatus String   @map("new_status")
+  changedAt DateTime @default(now()) @map("changed_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+model Payment {
+  id             String    @id @default(uuid())
+  orderId        String    @map("order_id")
+  method         String
+  status         String    @default("pending")
+  amount         Decimal   @db.Decimal(10, 2)
+  pixCopyPaste   String?   @map("pix_copy_paste")
+  idempotencyKey String?   @map("idempotency_key")
+  paidAt         DateTime? @map("paid_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([idempotencyKey])
+  @@map("payments")
+}
+
+model StockMovement {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  type      String
+  quantity  Decimal  @db.Decimal(10, 3)
+  reason    String?
+  orderId   String?  @map("order_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@map("stock_movements")
+}
+
+model StoreSettings {
+  id              String  @id @default("default")
+  storeName       String  @map("store_name")
+  tagline         String?
+  deliveryFee     Decimal @default(12) @map("delivery_fee") @db.Decimal(10, 2)
+  minOrderValue   Decimal @default(49) @map("min_order_value") @db.Decimal(10, 2)
+  whatsapp        String?
+  aboutText       String? @map("about_text")
+  heroImageUrl    String? @map("hero_image_url")
+  heroFallbackUrls Json?  @map("hero_fallback_urls")
+  homeCardsJson   Json?   @map("home_cards_json")
+
+  @@map("store_settings")
+}
+
+// --- Pomar Fresh: modulo de custo e preco ---
+
+// category: fruta | legume | verdura
+// purchaseUnit: kg | unit | caixa | bandeja
+model Ingredient {
+  id               String   @id @default(uuid())
+  name             String
+  category         String
+  purchaseUnit     String   @map("purchase_unit")
+  avgYieldPercent  Decimal  @default(100) @map("avg_yield_percent") @db.Decimal(5, 2)
+  costPerKgNet     Decimal  @default(0) @map("cost_per_kg_net") @db.Decimal(10, 4)
+  stockGrossQty    Decimal  @default(0) @map("stock_gross_qty") @db.Decimal(10, 3)
+  stockNetQty      Decimal  @default(0) @map("stock_net_qty") @db.Decimal(10, 3)
+  minStock         Decimal  @default(0) @map("min_stock") @db.Decimal(10, 3)
+  perishable       Boolean  @default(true)
+  active           Boolean  @default(true)
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  purchases        IngredientPurchase[]
+  yieldRecords     YieldRecord[]
+  stockMovements   IngredientStockMovement[]
+  recipeItems      RecipeItem[]
+  productionNeeds  ProductionPlanIngredient[]
+
+  @@index([category])
+  @@map("ingredients")
+}
+
+model IngredientPurchase {
+  id               String    @id @default(uuid())
+  ingredientId     String    @map("ingredient_id")
+  supplier         String?
+  purchaseDate     DateTime  @map("purchase_date") @db.Date
+  pricePaid        Decimal   @map("price_paid") @db.Decimal(10, 2)
+  grossWeightGrams Int       @map("gross_weight_grams")
+  netWeightGrams   Int       @map("net_weight_grams")
+  yieldPercent     Decimal   @map("yield_percent") @db.Decimal(5, 2)
+  costPerKgNet     Decimal   @map("cost_per_kg_net") @db.Decimal(10, 4)
+  expiryDate       DateTime? @map("expiry_date") @db.Date
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@index([ingredientId])
+  @@index([purchaseDate])
+  @@map("ingredient_purchases")
+}
+
+// lossType: casca | sementes | folhas | estragado | limpeza | corte
+model YieldRecord {
+  id               String   @id @default(uuid())
+  ingredientId     String   @map("ingredient_id")
+  lossType         String   @map("loss_type")
+  grossWeightGrams Int      @map("gross_weight_grams")
+  netWeightGrams   Int      @map("net_weight_grams")
+  yieldPercent     Decimal  @map("yield_percent") @db.Decimal(5, 2)
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@index([ingredientId])
+  @@map("yield_records")
+}
+
+model Packaging {
+  id             String   @id @default(uuid())
+  name           String
+  type           String
+  sizeLabel      String   @map("size_label")
+  unitCost       Decimal  @map("unit_cost") @db.Decimal(10, 2)
+  capacityGrams  Int?     @map("capacity_grams")
+  capacityMl     Int?     @map("capacity_ml")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  recipes Recipe[]
+  productionPlans ProductionPlanPackaging[]
+
+  @@map("packaging")
+}
+
+model Recipe {
+  id                  String   @id @default(uuid())
+  name                String
+  productId           String?  @map("product_id")
+  comboId             String?  @map("combo_id")
+  packagingId         String?  @map("packaging_id")
+  targetMarginPercent Decimal  @default(120) @map("target_margin_percent") @db.Decimal(6, 2)
+  minMarginPercent    Decimal  @default(80) @map("min_margin_percent") @db.Decimal(6, 2)
+  idealMarginPercent  Decimal  @default(150) @map("ideal_margin_percent") @db.Decimal(6, 2)
+  wastePercent        Decimal  @default(0) @map("waste_percent") @db.Decimal(5, 2)
+  feePercent          Decimal  @default(0) @map("fee_percent") @db.Decimal(5, 2)
+  computedCost        Decimal  @default(0) @map("computed_cost") @db.Decimal(10, 2)
+  suggestedPrice      Decimal  @default(0) @map("suggested_price") @db.Decimal(10, 2)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  product   Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  combo     Combo?     @relation(fields: [comboId], references: [id], onDelete: SetNull)
+  packaging Packaging? @relation(fields: [packagingId], references: [id], onDelete: SetNull)
+  items     RecipeItem[]
+
+  @@index([productId])
+  @@index([comboId])
+  @@map("recipes")
+}
+
+model RecipeItem {
+  id             String  @id @default(uuid())
+  recipeId       String  @map("recipe_id")
+  ingredientId   String  @map("ingredient_id")
+  quantityGrams  Int     @map("quantity_grams")
+  sortOrder      Int     @default(0) @map("sort_order")
+
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+
+  @@index([recipeId])
+  @@map("recipe_items")
+}
+
+model PricingSettings {
+  id                    String  @id @default("default")
+  defaultTargetMargin   Decimal @default(120) @map("default_target_margin") @db.Decimal(6, 2)
+  defaultMinMargin      Decimal @default(80) @map("default_min_margin") @db.Decimal(6, 2)
+  defaultIdealMargin    Decimal @default(150) @map("default_ideal_margin") @db.Decimal(6, 2)
+  roundIncrement        Decimal @default(0.1) @map("round_increment") @db.Decimal(4, 2)
+  autoUpdatePrices      Boolean @default(false) @map("auto_update_prices")
+  perishableMarkupBoost Decimal @default(10) @map("perishable_markup_boost") @db.Decimal(5, 2)
+  yieldHistorySize      Int     @default(20) @map("yield_history_size")
+
+  @@map("pricing_settings")
+}
+
+// type: low_margin | high_cost | high_waste | expiry_soon | no_profit
+model PricingAlert {
+  id         String   @id @default(uuid())
+  type       String
+  message    String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([read])
+  @@map("pricing_alerts")
+}
+
+// type: in_gross | process_net | out_sale | adjustment
+model IngredientStockMovement {
+  id           String   @id @default(uuid())
+  ingredientId String   @map("ingredient_id")
+  type         String
+  quantity     Decimal  @db.Decimal(10, 3)
+  reason       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+
+  @@index([ingredientId])
+  @@map("ingredient_stock_movements")
+}

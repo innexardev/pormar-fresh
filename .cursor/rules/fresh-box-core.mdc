@@ -1,0 +1,41 @@
+---
+description: Fresh Box core — produto, stack e prioridades
+alwaysApply: true
+---
+
+# Pomar Fresh
+
+Produto: site + cardápio + pedidos online de **combos de frutas, legumes e verduras cortados** em recipientes, com painel admin, estoque e entrega **2x por semana**.
+
+## Documentos de referencia
+
+- `docs/PLANEJAMENTO-MASTER.md` — planejamento consolidado
+- `docs/04-FEATURES-DETALHADAS.md` — cada feature F1–F20
+- `docs/08-ROADMAP-E-BACKLOG.md` — fases P0–P3
+- `README.md`, `apps/api/prisma/schema.prisma`
+
+## Stack
+
+- API: NestJS + Prisma + PostgreSQL (porta 3010)
+- Site publico: Next.js + Tailwind (porta 3020)
+- Admin: Next.js + Tailwind (porta 3021)
+- Pagamento: Pix (mock no MVP, integrar Asaas depois)
+
+## Regras gerais
+
+1. Negocio single-store (nao e SaaS multi-tenant).
+2. Produtos com unidade (`kg`, `g`, `unit`, `portion`), peso e estoque.
+3. Combos com itens, quantidade/peso e preco fechado.
+4. Entrega apenas nas janelas configuradas (terca e sexta por padrao).
+5. Baixa de estoque ao confirmar pagamento do pedido.
+6. Dinheiro: Prisma `Decimal`, nunca float.
+7. UI em pt-BR; codigo e logs em en-US.
+
+## Rotas principais
+
+- Site: `/`, `/cardapio`, `/checkout`, `/pedido/[id]`
+- Admin: `/dashboard`, `/pedidos`, `/produtos`, `/combos`, `/estoque`
+
+## Credenciais demo
+
+- Admin: `admin@freshbox.com` / `admin123`

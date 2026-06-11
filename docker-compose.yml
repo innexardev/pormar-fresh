@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: freshbox-postgres
+    environment:
+      POSTGRES_USER: freshbox
+      POSTGRES_PASSWORD: freshbox
+      POSTGRES_DB: freshbox
+    ports:
+      - "5433:5432"
+    volumes:
+      - freshbox_pg:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: freshbox-redis
+    ports:
+      - "6380:6379"
+
+volumes:
+  freshbox_pg:

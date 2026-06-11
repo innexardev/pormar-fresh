@@ -1,0 +1,20 @@
+---
+description: Backend NestJS — API Fresh Box
+globs: apps/api/src/**/*
+alwaysApply: false
+---
+
+# Backend Fresh Box
+
+```
+controller → DTO/class-validator → service → Prisma
+```
+
+- Modulos: auth, store, catalog, delivery, orders, payments, admin.
+- Prefixo API: `/api/v1`.
+- Erros de dominio com mensagem clara; HTTP mapping no controller.
+- Pagamentos Pix: idempotencia obrigatoria.
+- Status de pedido: validar transicao em `OrdersService` (STATUS_FLOW).
+- Nao acessar Prisma direto nos apps Next.js — usar API REST.
+
+Referencia: `apps/api/src/orders/orders.service.ts`, `apps/api/prisma/schema.prisma`.

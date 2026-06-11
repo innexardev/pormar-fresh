@@ -1,0 +1,37 @@
+---
+description: Regras de negocio Fresh Box — combos, estoque, entrega e pedidos
+globs: "{apps/api/**/*.ts,apps/api/prisma/**/*}"
+alwaysApply: false
+---
+
+# Fresh Box Domain
+
+## Pedidos
+
+- Fluxo: `pending -> confirmed -> preparing -> ready -> out_for_delivery -> delivered`.
+- Cancelamento apenas antes de `delivered`, com historico.
+- Pedido minimo e taxa de entrega vêm de `StoreSettings`.
+- Cliente deve escolher janela de entrega (DeliveryWindow) no checkout.
+
+## Entrega 2x/semana
+
+- Janelas padrao: terca (weekday 2) e sexta (weekday 5).
+- Respeitar cutoff (ex: pedido ate segunda 18h para entrega de terca).
+- `DeliveryService.getAvailableWindows()` e a fonte de verdade para slots.
+
+## Produtos e combos
+
+- Produto avulso: validar `stockQty` antes de aceitar pedido.
+- Combo: preco fechado; itens listados em `ComboItem` (nome, qty, unidade).
+- Unidades aceitas: `kg`, `g`, `unit`, `portion`.
+
+## Estoque
+
+- Baixa automatica em produtos avulsos quando pedido vai para `confirmed`.
+- Movimentacoes registradas em `StockMovement` (`in`, `out`, `adjustment`).
+- Alertar quando `stockQty <= minStock`.
+
+## Pagamentos
+
+- Pix idempotente por pedido (`idempotencyKey`).
+- Confirmacao de pagamento dispara transicao para `confirmed` e baixa estoque.

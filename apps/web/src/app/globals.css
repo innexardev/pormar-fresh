@@ -1,0 +1,43 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@layer base {
+  body {
+    @apply bg-fresh-50/40 text-stone-800 antialiased font-sans;
+  }
+
+  h1, h2, h3 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+  .animate-delay-500 { animation-delay: 500ms; }
+
+  .glass {
+    @apply bg-white/80 backdrop-blur-md;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-fresh-600 to-fresh-400 bg-clip-text text-transparent;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-full bg-fresh-500 px-8 py-3 font-semibold text-white shadow-soft transition-all duration-300 hover:bg-fresh-600 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center rounded-full border-2 border-fresh-400/60 px-8 py-3 font-semibold text-fresh-700 transition-all duration-300 hover:border-fresh-500 hover:bg-fresh-100/80 hover:-translate-y-0.5;
+  }
+
+  .card-product {
+    @apply relative overflow-hidden rounded-2xl bg-white shadow-card transition-all duration-500 hover:-translate-y-2 hover:shadow-card-hover;
+  }
+}

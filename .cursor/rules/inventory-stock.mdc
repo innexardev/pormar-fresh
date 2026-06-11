@@ -1,0 +1,13 @@
+---
+description: Estoque e quantidades — Fresh Box
+alwaysApply: true
+---
+
+# Estoque e quantidades
+
+- `stockQty` e `minStock` usam Decimal com 3 casas quando necessario (kg).
+- Nunca permitir pedido de produto avulso acima do estoque disponivel.
+- Toda alteracao manual de estoque deve criar `StockMovement` com motivo.
+- Combos nao baixam estoque item a item no MVP — apenas produtos avulsos no pedido.
+- Peso exibido ao cliente via `weightGrams` ou `weightLabel` do combo.
+- Nao usar float para precos ou quantidades de estoque.

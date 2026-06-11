@@ -1,0 +1,27 @@
+---
+description: Frontend Next.js — site publico e admin Fresh Box
+globs: "{apps/web/**/*.{tsx,ts},apps/admin/**/*.{tsx,ts}}"
+alwaysApply: false
+---
+
+# Frontend Fresh Box
+
+## apps/web (cliente)
+
+- Mobile-first no cardapio e checkout.
+- Destaque visual para combos (`featured`).
+- Carrinho via Zustand (`apps/web/src/store/cart.ts`).
+- Checkout deve listar janelas de `/public/delivery/windows`.
+- Simulacao Pix em demo via `/public/orders/:id/payments/simulate`.
+
+## apps/admin (operacao)
+
+- JWT em `localStorage` (`token`).
+- Shell lateral: dashboard, pedidos, produtos, combos, estoque.
+- Avancar status de pedido conforme fluxo operacional (corte no dia).
+
+## Geral
+
+- Tailwind + paleta verde (`fresh-*`).
+- UI pt-BR; codigo en-US.
+- Sem logica de estoque/preco duplicada no frontend — confiar na API.
