@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards';
 import { PricingService } from './pricing.service';
 import { PricingAlertsService } from './pricing-alerts.service';
@@ -42,6 +42,11 @@ export class PricingController {
     return this.pricing.updateIngredient(id, body as Parameters<PricingService['updateIngredient']>[1]);
   }
 
+  @Delete('ingredients/:id')
+  deleteIngredient(@Param('id') id: string) {
+    return this.pricing.deleteIngredient(id);
+  }
+
   @Post('ingredients/:id/purchases')
   registerPurchase(@Param('id') id: string, @Body() body: Parameters<PricingService['registerPurchase']>[1]) {
     return this.pricing.registerPurchase(id, body);
@@ -72,6 +77,11 @@ export class PricingController {
     return this.pricing.updatePackaging(id, body as Parameters<PricingService['updatePackaging']>[1]);
   }
 
+  @Delete('packaging/:id')
+  deletePackaging(@Param('id') id: string) {
+    return this.pricing.deletePackaging(id);
+  }
+
   @Get('recipes')
   listRecipes() {
     return this.pricing.listRecipes();
@@ -85,6 +95,11 @@ export class PricingController {
   @Patch('recipes/:id')
   updateRecipe(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.pricing.updateRecipe(id, body as Parameters<PricingService['updateRecipe']>[1]);
+  }
+
+  @Delete('recipes/:id')
+  deleteRecipe(@Param('id') id: string) {
+    return this.pricing.deleteRecipe(id);
   }
 
   @Post('recipes/:id/simulate')

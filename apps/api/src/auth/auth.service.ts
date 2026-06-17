@@ -28,7 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       secretOrKey: config.get('JWT_SECRET') || 'change-me',
     });
   }
-  validate(payload: { sub: string; email: string; role: string }) {
+  validate(payload: { sub: string; email?: string; role: string }) {
     return { userId: payload.sub, email: payload.email, role: payload.role };
   }
 }

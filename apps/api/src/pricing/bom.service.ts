@@ -73,6 +73,23 @@ export class BomService {
     return { lines: [...aggregated.values()], warnings };
   }
 
+  async validateStock(
+    items: Array<{ comboId: string | null; productId: string | null; quantity: Prisma.Decimal; itemName: string }>,
+  ): Promise<{ ok: boolean; errors: string[]; warnings: string[] }> {
+    const maps = await this.loadRecipeMaps();
+    const { lines, warnings } = this.explodeOrderItems(items, maps);
+    const errors: string[] = [];
+
+    for (const line of lines) {
+      const netKg = new Prisma.Decimal(line.netGrams).div(1000);
+      if (line.ingredient.stockNetQty.lt(netKg)) {
+        errors.push(`Ingrediente insuficiente: ${line.ingredient.name}`);
+      }
+    }
+
+    return { ok: errors.length === 0, errors, warnings };
+  }
+
   async deductForOrder(
     orderId: string,
     items: Array<{
@@ -122,5 +139,47 @@ export class BomService {
     });
 
     return { deducted };
+  }
+
+  async restoreForOrder(
+    orderId: string,
+    items: Array<{
+      comboId: string | null;
+      productId: string | null;
+      quantity: Prisma.Decimal;
+      itemName: string;
+    }>,
+  ) {
+    const maps = await this.loadRecipeMaps();
+    const { lines } = this.explodeOrderItems(items, maps);
+    if (lines.length === 0) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const line of lines) {
+        const netKg = new Prisma.Decimal(line.netGrams).div(1000);
+        const grossGrams = netToGrossGrams(line.netGrams, line.ingredient.avgYieldPercent);
+        const grossKg = new Prisma.Decimal(grossGrams).div(1000);
+
+        const current = await tx.ingredient.findUnique({ where: { id: line.ingredientId } });
+        if (!current) continue;
+
+        await tx.ingredient.update({
+          where: { id: line.ingredientId },
+          data: {
+            stockNetQty: current.stockNetQty.add(netKg),
+            stockGrossQty: current.stockGrossQty.add(grossKg),
+          },
+        });
+
+        await tx.ingredientStockMovement.create({
+          data: {
+            ingredientId: line.ingredientId,
+            type: 'adjustment',
+            quantity: netKg,
+            reason: `Cancelamento pedido ${orderId.slice(0, 8)}`,
+          },
+        });
+      }
+    });
   }
 }

@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { fetchApi } from '@/lib/api';
 import { HeroSection } from '@/components/HeroSection';
 import { ComboCard } from '@/components/ComboCard';
-import { FALLBACK_IMAGES, HOME_CARDS_DEFAULT, sanitizeImageUrl } from '@/lib/images';
+import { FALLBACK_IMAGES, HOME_CARDS_DEFAULT, sanitizeImageUrl, withMediaCacheBust } from '@/lib/images';
 
 type Store = {
   name: string;
@@ -30,6 +30,8 @@ type Menu = {
 };
 
 const DEFAULT_CARDS = HOME_CARDS_DEFAULT;
+
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   let store: Store = { name: 'Pomar Fresh', min_order_value: 49, delivery_fee: 12 };
@@ -91,9 +93,10 @@ export default async function HomePage() {
             >
               <div className="relative h-48 overflow-hidden">
                 <Image
-                  src={item.image_url || FALLBACK_IMAGES.salad}
+                  src={withMediaCacheBust(item.image_url || FALLBACK_IMAGES.salad)}
                   alt={item.title}
                   fill
+                  unoptimized={item.image_url?.includes('/media/pomar-fresh/')}
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                   sizes="(max-width:768px) 100vw, 33vw"
                 />
@@ -114,8 +117,11 @@ export default async function HomePage() {
         <div className="relative">
           <h2 className="font-display text-3xl font-bold">Pronto para começar?</h2>
           <p className="mt-3 text-fresh-100">
-            Pedido mínimo R$ {store.min_order_value.toFixed(2)} · Taxa de entrega R$ {store.delivery_fee.toFixed(2)}
+            Pedido mínimo R$ {store.min_order_value.toFixed(2)} · Entrega a partir de R$ {store.delivery_fee.toFixed(2)}
           </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm text-fresh-100">
+            <Link href="/entrega" className="underline hover:text-white">Ver áreas de entrega</Link>
+          </div>
           <Link href="/cardapio" className="mt-8 inline-block rounded-full bg-white px-10 py-3.5 font-semibold text-fresh-700 shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover">
             Fazer pedido
           </Link>

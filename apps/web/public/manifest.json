@@ -1,0 +1,18 @@
+{
+  "name": "Pomar Fresh",
+  "short_name": "Pomar Fresh",
+  "description": "Frutas, legumes e verduras cortadas no dia — entrega 2x por semana",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

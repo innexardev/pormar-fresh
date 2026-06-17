@@ -6,6 +6,9 @@ Indice completo de contexto, planejamento e especificacao por feature.
 
 | # | Documento | Conteudo |
 |---|-----------|----------|
+| 0 | **[PLANO-MASTER-COMPLETO.md](./PLANO-MASTER-COMPLETO.md)** | **Roadmap consolidado** — cliente, WhatsApp, fornecedores, custos |
+| — | **[MANUAL-ADMIN.md](./MANUAL-ADMIN.md)** | **Manual completo do painel admin** — receitas, fluxos, cada tela |
+| — | **[ROADMAP-DIFERENCIAL.md](./ROADMAP-DIFERENCIAL.md)** | **Comunicação inteligente, suporte, alertas equipe, próximos passos** |
 | 1 | [01-CONTEXTO-E-VISAO.md](./01-CONTEXTO-E-VISAO.md) | Problema, solucao, publico, proposta de valor |
 | 2 | [02-MODELO-NEGOCIO.md](./02-MODELO-NEGOCIO.md) | Precificacao, entrega 2x/semana, operacao |
 | 3 | [03-ARQUITETURA-TECNICA.md](./03-ARQUITETURA-TECNICA.md) | Stack, monorepo, modulos, portas |

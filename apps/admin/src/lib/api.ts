@@ -22,6 +22,18 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
-  if (!res.ok) throw new Error('Erro na requisicao');
-  return res.json();
+  if (!res.ok) {
+    let message = 'Erro na requisicao';
+    try {
+      const body = await res.json();
+      message = body.message ?? body.error ?? message;
+      if (Array.isArray(body.message)) message = body.message.join(', ');
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  const text = await res.text();
+  if (!text) return {} as T;
+  return JSON.parse(text) as T;
 }

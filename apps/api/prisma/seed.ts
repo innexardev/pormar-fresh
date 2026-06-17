@@ -1,10 +1,23 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { seedCatalog, catalogId } from './seed-catalog';
 
 const prisma = new PrismaClient();
 
 async function main() {
   const passwordHash = await bcrypt.hash('admin123', 10);
+  const driverPin = process.env.DRIVER_PIN || '847291';
+  const driverPinHash = await bcrypt.hash(driverPin, 10);
+
+  const depotAddress = {
+    street: process.env.DEPOT_STREET || 'Av. Presidente Kennedy',
+    number: process.env.DEPOT_NUMBER || '1000',
+    complement: process.env.DEPOT_COMPLEMENT || '',
+    neighborhood: process.env.DEPOT_NEIGHBORHOOD || 'Vila Mirim',
+    city: process.env.DEPOT_CITY || 'Praia Grande',
+    state: process.env.DEPOT_STATE || 'SP',
+    zip_code: process.env.DEPOT_ZIP_CODE || '11705000',
+  };
 
   await prisma.user.upsert({
     where: { email: 'admin@freshbox.com' },
@@ -16,6 +29,8 @@ async function main() {
     where: { id: 'default' },
     update: {
       storeName: 'Pomar Fresh',
+      driverPinHash,
+      depotAddressJson: depotAddress,
       tagline: 'Frutas, legumes e verduras frescas — cortados no dia da entrega',
       heroImageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=1200&q=80',
       heroFallbackUrls: [
@@ -31,6 +46,8 @@ async function main() {
     create: {
       id: 'default',
       storeName: 'Pomar Fresh',
+      driverPinHash,
+      depotAddressJson: depotAddress,
       tagline: 'Frutas, legumes e verduras frescas — cortados no dia da entrega',
       deliveryFee: 12,
       minOrderValue: 49,
@@ -48,27 +65,6 @@ async function main() {
         { title: 'Combos & avulsos', description: 'Escolha combos prontos ou monte do seu jeito.', image_url: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=600&q=80' },
       ],
     },
-  });
-
-  const catCombos = await prisma.category.upsert({
-    where: { slug: 'combos' },
-    update: {},
-    create: { name: 'Combos', slug: 'combos', position: 1 },
-  });
-  const catFrutas = await prisma.category.upsert({
-    where: { slug: 'frutas' },
-    update: {},
-    create: { name: 'Frutas', slug: 'frutas', position: 2 },
-  });
-  const catLegumes = await prisma.category.upsert({
-    where: { slug: 'legumes' },
-    update: {},
-    create: { name: 'Legumes', slug: 'legumes', position: 3 },
-  });
-  const catVerduras = await prisma.category.upsert({
-    where: { slug: 'verduras' },
-    update: {},
-    create: { name: 'Verduras', slug: 'verduras', position: 4 },
   });
 
   await prisma.deliveryWindow.upsert({
@@ -96,138 +92,7 @@ async function main() {
     },
   });
 
-  const morango = await prisma.product.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000101' },
-    update: { imageUrl: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=600&q=80' },
-    create: {
-      id: '00000000-0000-4000-8000-000000000101',
-      categoryId: catFrutas.id,
-      name: 'Morango cortado',
-      description: 'Recipiente 300g, cortado no dia',
-      unitType: 'portion',
-      weightGrams: 300,
-      price: 18.9,
-      stockQty: 40,
-      minStock: 10,
-      imageUrl: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=600&q=80',
-    },
-  });
-
-  await prisma.product.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000102' },
-    update: { imageUrl: 'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?auto=format&fit=crop&w=600&q=80' },
-    create: {
-      id: '00000000-0000-4000-8000-000000000102',
-      categoryId: catFrutas.id,
-      name: 'Manga em cubos',
-      unitType: 'portion',
-      weightGrams: 400,
-      price: 14.9,
-      stockQty: 30,
-      minStock: 8,
-      imageUrl: 'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?auto=format&fit=crop&w=600&q=80',
-    },
-  });
-
-  await prisma.product.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000201' },
-    update: { imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=600&q=80' },
-    create: {
-      id: '00000000-0000-4000-8000-000000000201',
-      categoryId: catLegumes.id,
-      name: 'Cenoura ralada',
-      unitType: 'kg',
-      weightGrams: 500,
-      price: 9.9,
-      stockQty: 25,
-      minStock: 5,
-      imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=600&q=80',
-    },
-  });
-
-  await prisma.product.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000301' },
-    update: { imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80' },
-    create: {
-      id: '00000000-0000-4000-8000-000000000301',
-      categoryId: catVerduras.id,
-      name: 'Alface americana picada',
-      unitType: 'portion',
-      weightGrams: 200,
-      price: 8.9,
-      stockQty: 35,
-      minStock: 10,
-      imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
-    },
-  });
-
-  const comboSalada = await prisma.combo.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000401' },
-    update: { imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80' },
-    create: {
-      id: '00000000-0000-4000-8000-000000000401',
-      categoryId: catCombos.id,
-      name: 'Combo Salada da Semana',
-      description: 'Mix de folhas, tomate, pepino e cenoura — tudo lavado e cortado',
-      price: 59.9,
-      weightLabel: '~1,2 kg total',
-      servesPeople: 4,
-      featured: true,
-      imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80',
-    },
-  });
-
-  await prisma.comboItem.deleteMany({ where: { comboId: comboSalada.id } });
-  await prisma.comboItem.createMany({
-    data: [
-      { comboId: comboSalada.id, itemName: 'Alface picada', quantity: 200, unitLabel: 'g', sortOrder: 0 },
-      { comboId: comboSalada.id, itemName: 'Tomate cereja', quantity: 300, unitLabel: 'g', sortOrder: 1 },
-      { comboId: comboSalada.id, itemName: 'Pepino fatiado', quantity: 250, unitLabel: 'g', sortOrder: 2 },
-      { comboId: comboSalada.id, itemName: 'Cenoura ralada', quantity: 200, unitLabel: 'g', sortOrder: 3, productId: '00000000-0000-4000-8000-000000000201' },
-    ],
-  });
-
-  const comboFrutas = await prisma.combo.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000402' },
-    update: { imageUrl: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&w=600&q=80' },
-    create: {
-      id: '00000000-0000-4000-8000-000000000402',
-      categoryId: catCombos.id,
-      name: 'Combo Frutas do Dia',
-      description: 'Selecao variada de frutas frescas cortadas em recipientes',
-      price: 69.9,
-      weightLabel: '~1 kg total',
-      servesPeople: 3,
-      featured: true,
-      imageUrl: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&w=600&q=80',
-    },
-  });
-
-  await prisma.comboItem.deleteMany({ where: { comboId: comboFrutas.id } });
-  await prisma.comboItem.createMany({
-    data: [
-      { comboId: comboFrutas.id, itemName: 'Morango', quantity: 300, unitLabel: 'g', sortOrder: 0, productId: morango.id },
-      { comboId: comboFrutas.id, itemName: 'Manga', quantity: 400, unitLabel: 'g', sortOrder: 1 },
-      { comboId: comboFrutas.id, itemName: 'Melancia', quantity: 400, unitLabel: 'g', sortOrder: 2 },
-      { comboId: comboFrutas.id, itemName: 'Uva verde', quantity: 250, unitLabel: 'g', sortOrder: 3 },
-    ],
-  });
-
-  await prisma.combo.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000403' },
-    update: { imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=600&q=80' },
-    create: {
-      id: '00000000-0000-4000-8000-000000000403',
-      categoryId: catCombos.id,
-      name: 'Combo Sopas & Caldos',
-      description: 'Legumes picados prontos para panela de pressao',
-      price: 54.9,
-      weightLabel: '~1,5 kg',
-      servesPeople: 6,
-      featured: false,
-      imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=600&q=80',
-    },
-  });
+  await seedCatalog(prisma);
 
   console.log('Seed OK');
   console.log('Admin: admin@freshbox.com / admin123');
@@ -347,7 +212,7 @@ async function main() {
     create: {
       id: '00000000-0000-4000-8000-000000000801',
       name: 'Pote Tropical 500ml',
-      comboId: comboFrutas.id,
+      comboId: catalogId('combo', 'individual-tropical'),
       packagingId: pote500.id,
       targetMarginPercent: 120,
       computedCost: 5.3,
@@ -366,6 +231,94 @@ async function main() {
   });
 
   console.log('Pomar Fresh pricing module seeded');
+
+  await seedComboRecipes(prisma);
+
+  await prisma.deliveryZone.updateMany({
+    where: { id: { in: ['00000000-0000-4000-8000-000000000010', '00000000-0000-4000-8000-000000000011'] } },
+    data: { active: false },
+  });
+
+  await prisma.deliveryZone.upsert({
+    where: { id: '00000000-0000-4000-8000-000000000012' },
+    update: {
+      label: 'Praia Grande — SP',
+      zipPrefixes: ['11700', '11701', '11702', '11703', '11704', '11705', '11706', '11707'],
+      neighborhoods: [],
+      deliveryFee: 12,
+      sortOrder: 1,
+      active: true,
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000000012',
+      label: 'Praia Grande — SP',
+      zipPrefixes: ['11700', '11701', '11702', '11703', '11704', '11705', '11706', '11707'],
+      neighborhoods: [],
+      deliveryFee: 12,
+      sortOrder: 1,
+      active: true,
+    },
+  });
+
+  console.log('Zona de entrega: Praia Grande (CEP 11700–11707)');
+
+  await prisma.promoCode.upsert({
+    where: { code: 'POMAR10' },
+    update: {},
+    create: {
+      code: 'POMAR10',
+      discountType: 'percent',
+      discountValue: 10,
+      minOrderValue: 49,
+      active: true,
+      maxUses: 100,
+    },
+  });
+
+  console.log('Delivery zones and promo POMAR10 seeded');
+}
+
+/** Cria receitas automaticamente para combos que ainda não têm (BOM / checkout). */
+async function seedComboRecipes(prisma: PrismaClient) {
+  const ingredients = await prisma.ingredient.findMany();
+  const byName = new Map(ingredients.map((i) => [i.name.toLowerCase(), i]));
+
+  const combos = await prisma.combo.findMany({
+    where: { active: true },
+    include: { items: { orderBy: { sortOrder: 'asc' } } },
+  });
+
+  let created = 0;
+  for (const combo of combos) {
+    const existing = await prisma.recipe.findFirst({ where: { comboId: combo.id, active: true } });
+    if (existing) continue;
+
+    const recipeItems = combo.items
+      .map((ci) => {
+        const ing = byName.get(ci.itemName.toLowerCase());
+        if (!ing) return null;
+        return {
+          ingredientId: ing.id,
+          quantityGrams: Number(ci.quantity),
+          sortOrder: ci.sortOrder,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    if (recipeItems.length === 0) continue;
+
+    await prisma.recipe.create({
+      data: {
+        name: `Receita — ${combo.name}`,
+        comboId: combo.id,
+        active: true,
+        items: { create: recipeItems },
+      },
+    });
+    created++;
+  }
+
+  console.log(`Receitas auto-geradas: ${created} combos`);
 }
 
 main()

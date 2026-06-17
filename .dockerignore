@@ -1,0 +1,11 @@
+node_modules
+.git
+.env
+.env.*
+apps/*/.next
+apps/api/dist
+e2e
+docs
+*.md
+playwright-report
+test-results

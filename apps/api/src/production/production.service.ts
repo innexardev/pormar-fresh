@@ -103,7 +103,11 @@ export class ProductionService {
     for (let weekOffset = 0; weekOffset < 3; weekOffset++) {
       for (const w of windows) {
         const deliveryDate = this.nextDateForWeekday(w.weekday, weekOffset);
-        const cutoff = computeCutoff(deliveryDate, w.cutoffWeekday, w.cutoffHour);
+        const cutoff = computeCutoff(deliveryDate, {
+          cutoffWeekday: w.cutoffWeekday,
+          cutoffHour: w.cutoffHour,
+          orderDeadlineDaysBefore: w.orderDeadlineDaysBefore,
+        });
         const dateStr = deliveryDate.toISOString().slice(0, 10);
 
         const ordersCount = await this.prisma.order.count({
@@ -147,7 +151,11 @@ export class ProductionService {
     if (!window?.active) throw new BadRequestException('Janela de entrega invalida');
 
     const date = new Date(deliveryDate);
-    const cutoff = computeCutoff(date, window.cutoffWeekday, window.cutoffHour);
+    const cutoff = computeCutoff(date, {
+      cutoffWeekday: window.cutoffWeekday,
+      cutoffHour: window.cutoffHour,
+      orderDeadlineDaysBefore: window.orderDeadlineDaysBefore,
+    });
 
     const orders = await this.prisma.order.findMany({
       where: {

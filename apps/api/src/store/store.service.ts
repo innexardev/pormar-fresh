@@ -47,4 +47,35 @@ export class StoreService {
       },
     });
   }
+
+  async getAdminSettings() {
+    const s = await this.prisma.storeSettings.findUniqueOrThrow({ where: { id: 'default' } });
+    const zonesCount = await this.prisma.deliveryZone.count({ where: { active: true } });
+    return {
+      store_name: s.storeName,
+      tagline: s.tagline,
+      delivery_fee: Number(s.deliveryFee),
+      min_order_value: Number(s.minOrderValue),
+      whatsapp: s.whatsapp,
+      about_text: s.aboutText,
+      uses_delivery_zones: zonesCount > 0,
+    };
+  }
+
+  async updateAdminSettings(data: {
+    deliveryFee?: number;
+    minOrderValue?: number;
+    whatsapp?: string | null;
+    tagline?: string;
+  }) {
+    return this.prisma.storeSettings.update({
+      where: { id: 'default' },
+      data: {
+        deliveryFee: data.deliveryFee,
+        minOrderValue: data.minOrderValue,
+        whatsapp: data.whatsapp,
+        tagline: data.tagline,
+      },
+    });
+  }
 }

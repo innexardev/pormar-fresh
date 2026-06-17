@@ -42,6 +42,7 @@ export function ProductImage({
         fill={fill}
         priority={priority}
         sizes={sizes}
+        unoptimized={imgSrc.includes('onnshoppe.com')}
         className={`object-cover transition-transform duration-700 group-hover:scale-110 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => setLoaded(true)}
         onError={() => setImgSrc(fallback)}

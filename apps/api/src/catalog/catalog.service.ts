@@ -28,6 +28,8 @@ export class CatalogService {
       products: products.map((p) => ({
         id: p.id,
         category_id: p.categoryId,
+        category_slug: p.category?.slug ?? null,
+        category_name: p.category?.name ?? null,
         name: p.name,
         description: p.description,
         unit_type: p.unitType,
@@ -39,6 +41,9 @@ export class CatalogService {
       })),
       combos: combos.map((c) => ({
         id: c.id,
+        category_id: c.categoryId,
+        category_slug: c.category?.slug ?? null,
+        category_name: c.category?.name ?? null,
         name: c.name,
         description: c.description,
         price: Number(c.price),

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -38,7 +38,32 @@ export class AdminService {
     });
   }
 
-  updateProduct(id: string, data: Partial<{ name: string; price: number; active: boolean; stockQty: number; minStock: number; imageUrl: string | null }>) {
+  async deleteProduct(id: string) {
+    const inOrders = await this.prisma.orderItem.count({ where: { productId: id } });
+    if (inOrders > 0) {
+      throw new BadRequestException(
+        'Este produto possui pedidos associados e não pode ser excluído. Desative-o para ocultá-lo do cardápio.',
+      );
+    }
+    await this.prisma.stockMovement.deleteMany({ where: { productId: id } });
+    return this.prisma.product.delete({ where: { id } });
+  }
+
+  updateProduct(
+    id: string,
+    data: Partial<{
+      categoryId: string;
+      name: string;
+      description: string | null;
+      unitType: string;
+      weightGrams: number | null;
+      price: number;
+      active: boolean;
+      stockQty: number;
+      minStock: number;
+      imageUrl: string | null;
+    }>,
+  ) {
     return this.prisma.product.update({ where: { id }, data });
   }
 
@@ -113,8 +138,53 @@ export class AdminService {
     });
   }
 
-  updateCombo(id: string, data: Partial<{ name: string; price: number; active: boolean; featured: boolean; imageUrl: string | null }>) {
-    return this.prisma.combo.update({ where: { id }, data });
+  async deleteCombo(id: string) {
+    const inOrders = await this.prisma.orderItem.count({ where: { comboId: id } });
+    if (inOrders > 0) {
+      throw new BadRequestException(
+        'Este combo possui pedidos associados e não pode ser excluído. Desative-o para ocultá-lo do cardápio.',
+      );
+    }
+    await this.prisma.comboItem.deleteMany({ where: { comboId: id } });
+    return this.prisma.combo.delete({ where: { id } });
+  }
+
+  async updateCombo(
+    id: string,
+    data: Partial<{
+      name: string;
+      description: string | null;
+      price: number;
+      weightLabel: string | null;
+      servesPeople: number | null;
+      categoryId: string | null;
+      active: boolean;
+      featured: boolean;
+      imageUrl: string | null;
+      items: Array<{ itemName: string; quantity: number; unitLabel: string; productId?: string }>;
+    }>,
+  ) {
+    const { items, ...comboData } = data;
+    return this.prisma.$transaction(async (tx) => {
+      if (items) {
+        await tx.comboItem.deleteMany({ where: { comboId: id } });
+        await tx.comboItem.createMany({
+          data: items.map((i, idx) => ({
+            comboId: id,
+            itemName: i.itemName,
+            quantity: i.quantity,
+            unitLabel: i.unitLabel,
+            productId: i.productId,
+            sortOrder: idx,
+          })),
+        });
+      }
+      return tx.combo.update({
+        where: { id },
+        data: comboData,
+        include: { items: { orderBy: { sortOrder: 'asc' } } },
+      });
+    });
   }
 
   listCategories() {
@@ -122,6 +192,9 @@ export class AdminService {
   }
 
   dashboardStats() {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
     return Promise.all([
       this.prisma.order.count({ where: { status: { not: 'cancelled' } } }),
       this.prisma.order.count({
@@ -129,11 +202,52 @@ export class AdminService {
       }),
       this.prisma.product.count({ where: { active: true } }),
       this.prisma.combo.count({ where: { active: true } }),
-    ]).then(([totalOrders, activeOrders, products, combos]) => ({
+      this.prisma.order.aggregate({
+        where: { status: { notIn: ['cancelled', 'pending'] }, createdAt: { gte: weekAgo } },
+        _sum: { total: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['deliveryDate'],
+        where: { status: { notIn: ['cancelled'] }, deliveryDate: { gte: weekAgo } },
+        _sum: { total: true },
+        _count: true,
+        orderBy: { deliveryDate: 'asc' },
+      }),
+    ]).then(([totalOrders, activeOrders, products, combos, revenueWeek, byDelivery]) => ({
       total_orders: totalOrders,
       active_orders: activeOrders,
       products,
       combos,
+      revenue_week: Number(revenueWeek._sum.total ?? 0),
+      orders_by_delivery: byDelivery.map((r) => ({
+        date: r.deliveryDate.toISOString().slice(0, 10),
+        total: Number(r._sum.total ?? 0),
+        count: r._count,
+      })),
     }));
+  }
+
+  listCustomers(search?: string) {
+    return this.prisma.customer.findMany({
+      where: search
+        ? {
+            OR: [
+              { phone: { contains: search } },
+              { name: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : undefined,
+      include: {
+        orders: {
+          select: { id: true, total: true, status: true, createdAt: true, deliveryDate: true },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+        _count: { select: { orders: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
   }
 }

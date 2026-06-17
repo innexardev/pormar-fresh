@@ -1,42 +1,96 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { computeCutoff, formatCutoffLabel } from '../production/production-calculator';
 
-export type AvailableWindow = {
+export type DeliverySlot = {
+  slot_key: string;
   id: string;
   label: string;
   delivery_date: string;
   cutoff_at: string;
+  cutoff_label: string;
+  available: boolean;
+  unavailable_reason?: string;
 };
 
 @Injectable()
 export class DeliveryService {
   constructor(private prisma: PrismaService) {}
 
-  async getAvailableWindows(): Promise<AvailableWindow[]> {
+  async getAvailableWindows(): Promise<DeliverySlot[]> {
     const windows = await this.prisma.deliveryWindow.findMany({
       where: { active: true },
       orderBy: { sortOrder: 'asc' },
     });
 
-    const now = new Date();
-    const results: AvailableWindow[] = [];
+    const blocks = await this.prisma.deliveryBlock.findMany();
+    const blockedDates = new Set(blocks.map((b) => b.blockDate.toISOString().slice(0, 10)));
 
-    for (let weekOffset = 0; weekOffset < 3 && results.length < 4; weekOffset++) {
+    const now = new Date();
+    const slots: DeliverySlot[] = [];
+
+    for (let weekOffset = 0; weekOffset < 3; weekOffset++) {
       for (const w of windows) {
         const deliveryDate = this.nextDateForWeekday(w.weekday, weekOffset);
-        const cutoff = this.computeCutoff(deliveryDate, w.cutoffWeekday, w.cutoffHour);
-        if (cutoff > now) {
-          results.push({
-            id: w.id,
-            label: `${w.label} — ${this.formatDateBR(deliveryDate)}`,
-            delivery_date: deliveryDate.toISOString().slice(0, 10),
-            cutoff_at: cutoff.toISOString(),
-          });
-        }
+        const dateStr = deliveryDate.toISOString().slice(0, 10);
+        const slotKey = `${w.id}:${dateStr}`;
+
+        if (slots.some((s) => s.slot_key === slotKey)) continue;
+
+        const cutoff = computeCutoff(deliveryDate, {
+          cutoffWeekday: w.cutoffWeekday,
+          cutoffHour: w.cutoffHour,
+          orderDeadlineDaysBefore: w.orderDeadlineDaysBefore,
+        });
+
+        const blocked = blockedDates.has(dateStr);
+        const cutoffPassed = cutoff <= now;
+        const available = !blocked && !cutoffPassed;
+
+        let unavailableReason: string | undefined;
+        if (blocked) unavailableReason = 'Data indisponível';
+        else if (cutoffPassed) unavailableReason = `Prazo encerrado em ${formatCutoffLabel(cutoff)}`;
+
+        slots.push({
+          slot_key: slotKey,
+          id: w.id,
+          label: `${w.label} — ${this.formatDateBR(deliveryDate)}`,
+          delivery_date: dateStr,
+          cutoff_at: cutoff.toISOString(),
+          cutoff_label: formatCutoffLabel(cutoff),
+          available,
+          unavailable_reason: unavailableReason,
+        });
       }
     }
 
-    return results.slice(0, 4);
+    slots.sort((a, b) => a.delivery_date.localeCompare(b.delivery_date) || a.label.localeCompare(b.label));
+
+    return slots.slice(0, 8);
+  }
+
+  listWindowsAdmin() {
+    return this.prisma.deliveryWindow.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  updateWindow(
+    id: string,
+    data: {
+      label?: string;
+      cutoffHour?: number;
+      orderDeadlineDaysBefore?: number;
+      active?: boolean;
+    },
+  ) {
+    return this.prisma.deliveryWindow.update({
+      where: { id },
+      data: {
+        label: data.label,
+        cutoffHour: data.cutoffHour,
+        orderDeadlineDaysBefore: data.orderDeadlineDaysBefore,
+        active: data.active,
+      },
+    });
   }
 
   private nextDateForWeekday(weekday: number, weekOffset: number): Date {
@@ -48,16 +102,6 @@ export class DeliveryService {
     diff += weekOffset * 7;
     d.setDate(d.getDate() + diff);
     return d;
-  }
-
-  private computeCutoff(deliveryDate: Date, cutoffWeekday: number, cutoffHour: number): Date {
-    const cutoff = new Date(deliveryDate);
-    const deliveryDow = deliveryDate.getDay();
-    let daysBack = (deliveryDow - cutoffWeekday + 7) % 7;
-    if (daysBack === 0) daysBack = 7;
-    cutoff.setDate(cutoff.getDate() - daysBack);
-    cutoff.setHours(cutoffHour, 0, 0, 0);
-    return cutoff;
   }
 
   private formatDateBR(d: Date): string {

@@ -18,14 +18,38 @@ export const PRODUCTION_ORDER_STATUSES = [
   'out_for_delivery',
 ] as const;
 
-export function computeCutoff(deliveryDate: Date, cutoffWeekday: number, cutoffHour: number): Date {
+type WindowCutoff = {
+  cutoffWeekday: number;
+  cutoffHour: number;
+  orderDeadlineDaysBefore?: number | null;
+};
+
+/** Data/hora limite para pedidos antes da entrega. */
+export function computeCutoff(deliveryDate: Date, window: WindowCutoff): Date {
   const cutoff = new Date(deliveryDate);
-  const deliveryDow = deliveryDate.getDay();
-  let daysBack = (deliveryDow - cutoffWeekday + 7) % 7;
-  if (daysBack === 0) daysBack = 7;
-  cutoff.setDate(cutoff.getDate() - daysBack);
-  cutoff.setHours(cutoffHour, 0, 0, 0);
+  const daysBefore = window.orderDeadlineDaysBefore ?? 0;
+
+  if (daysBefore > 0) {
+    cutoff.setDate(cutoff.getDate() - daysBefore);
+  } else {
+    const deliveryDow = deliveryDate.getDay();
+    let daysBack = (deliveryDow - window.cutoffWeekday + 7) % 7;
+    if (daysBack === 0) daysBack = 7;
+    cutoff.setDate(cutoff.getDate() - daysBack);
+  }
+
+  cutoff.setHours(window.cutoffHour, 0, 0, 0);
   return cutoff;
+}
+
+export function formatCutoffLabel(cutoff: Date): string {
+  return cutoff.toLocaleString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export type IngredientSnapshot = {

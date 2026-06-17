@@ -1,12 +1,17 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
+import { SystemService } from './system.service';
 import { JwtAuthGuard } from '../common/guards';
 import { StoreService } from '../store/store.service';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard)
 export class AdminController {
-  constructor(private admin: AdminService, private store: StoreService) {}
+  constructor(
+    private admin: AdminService,
+    private store: StoreService,
+    private system: SystemService,
+  ) {}
 
   @Get('dashboard')
   dashboard() {
@@ -26,6 +31,11 @@ export class AdminController {
   @Patch('products/:id')
   updateProduct(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.admin.updateProduct(id, body as Parameters<AdminService['updateProduct']>[1]);
+  }
+
+  @Delete('products/:id')
+  deleteProduct(@Param('id') id: string) {
+    return this.admin.deleteProduct(id);
   }
 
   @Post('products/:id/stock')
@@ -61,9 +71,19 @@ export class AdminController {
     return this.admin.updateCombo(id, body as Parameters<AdminService['updateCombo']>[1]);
   }
 
+  @Delete('combos/:id')
+  deleteCombo(@Param('id') id: string) {
+    return this.admin.deleteCombo(id);
+  }
+
   @Get('categories')
   categories() {
     return this.admin.listCategories();
+  }
+
+  @Get('customers')
+  customers(@Query('search') search?: string) {
+    return this.admin.listCustomers(search);
   }
 
   @Get('site-content')
@@ -74,5 +94,20 @@ export class AdminController {
   @Patch('site-content')
   updateSiteContent(@Body() body: Parameters<StoreService['updateSiteContent']>[0]) {
     return this.store.updateSiteContent(body);
+  }
+
+  @Get('store-settings')
+  storeSettings() {
+    return this.store.getAdminSettings();
+  }
+
+  @Patch('store-settings')
+  updateStoreSettings(@Body() body: Parameters<StoreService['updateAdminSettings']>[0]) {
+    return this.store.updateAdminSettings(body);
+  }
+
+  @Get('system/status')
+  systemStatus() {
+    return this.system.getStatus();
   }
 }

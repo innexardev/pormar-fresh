@@ -36,9 +36,12 @@ export const useCart = create<CartState>()(
         set({ items: get().items.filter((i) => !(i.type === type && i.id === id)) }),
       setQty: (type, id, qty) =>
         set({
-          items: get().items.map((i) =>
-            i.type === type && i.id === id ? { ...i, qty: Math.max(1, qty) } : i,
-          ),
+          items:
+            qty <= 0
+              ? get().items.filter((i) => !(i.type === type && i.id === id))
+              : get().items.map((i) =>
+                  i.type === type && i.id === id ? { ...i, qty } : i,
+                ),
         }),
       clear: () => set({ items: [] }),
       total: () => get().items.reduce((a, i) => a + i.price * i.qty, 0),

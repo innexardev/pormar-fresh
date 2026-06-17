@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -128,14 +128,27 @@ export class PricingService {
     });
   }
 
-  updateIngredient(id: string, data: Partial<{ name: string; active: boolean; minStock: number; notes: string }>) {
+  updateIngredient(id: string, data: Partial<{ name: string; category: string; purchaseUnit: string; active: boolean; minStock: number; notes: string }>) {
     return this.prisma.ingredient.update({ where: { id }, data });
+  }
+
+  async deleteIngredient(id: string) {
+    const inRecipes = await this.prisma.recipeItem.count({ where: { ingredientId: id } });
+    if (inRecipes > 0) {
+      throw new BadRequestException('Este ingrediente está em uso em receitas e não pode ser excluído.');
+    }
+    await this.prisma.ingredientPurchase.deleteMany({ where: { ingredientId: id } });
+    await this.prisma.yieldRecord.deleteMany({ where: { ingredientId: id } });
+    await this.prisma.ingredientStockMovement.deleteMany({ where: { ingredientId: id } });
+    return this.prisma.ingredient.delete({ where: { id } });
   }
 
   async registerPurchase(
     ingredientId: string,
     data: {
       supplier?: string;
+      supplierId?: string;
+      invoiceId?: string;
       purchaseDate: string;
       pricePaid: number;
       grossWeightGrams: number;
@@ -156,6 +169,8 @@ export class PricingService {
         data: {
           ingredientId,
           supplier: data.supplier,
+          supplierId: data.supplierId,
+          invoiceId: data.invoiceId,
           purchaseDate: new Date(data.purchaseDate),
           pricePaid,
           grossWeightGrams: data.grossWeightGrams,
@@ -276,15 +291,52 @@ export class PricingService {
     name: string;
     type: string;
     sizeLabel: string;
-    unitCost: number;
+    unitCost: number | string;
     capacityGrams?: number;
     capacityMl?: number;
   }) {
-    return this.prisma.packaging.create({ data });
+    const unitCost = this.parseMoney(data.unitCost, 'Custo unitário');
+    return this.prisma.packaging.create({
+      data: {
+        name: data.name,
+        type: data.type,
+        sizeLabel: data.sizeLabel,
+        unitCost,
+        capacityGrams: data.capacityGrams ?? null,
+        capacityMl: data.capacityMl ?? null,
+      },
+    });
   }
 
-  updatePackaging(id: string, data: Partial<{ name: string; unitCost: number; active: boolean }>) {
+  private parseMoney(value: number | string | undefined | null, field: string): Prisma.Decimal {
+    if (value === undefined || value === null || value === '') {
+      throw new BadRequestException(`${field} é obrigatório`);
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value) || value < 0) {
+        throw new BadRequestException(`${field} inválido`);
+      }
+      return new Prisma.Decimal(value.toFixed(2));
+    }
+    const raw = String(value).trim().replace(/[R$\s]/g, '');
+    const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+    const num = Number(normalized);
+    if (!Number.isFinite(num) || num < 0) {
+      throw new BadRequestException(`${field} inválido`);
+    }
+    return new Prisma.Decimal(num.toFixed(2));
+  }
+
+  updatePackaging(id: string, data: Partial<{ name: string; type: string; sizeLabel: string; unitCost: number; capacityGrams: number; capacityMl: number; active: boolean }>) {
     return this.prisma.packaging.update({ where: { id }, data });
+  }
+
+  async deletePackaging(id: string) {
+    const inRecipes = await this.prisma.recipe.count({ where: { packagingId: id } });
+    if (inRecipes > 0) {
+      throw new BadRequestException('Esta embalagem está em uso em receitas e não pode ser excluída.');
+    }
+    return this.prisma.packaging.delete({ where: { id } });
   }
 
   // --- Recipes ---
@@ -369,6 +421,11 @@ export class PricingService {
     }
 
     return this.refreshRecipeCosts(id);
+  }
+
+  async deleteRecipe(id: string) {
+    await this.prisma.recipeItem.deleteMany({ where: { recipeId: id } });
+    return this.prisma.recipe.delete({ where: { id } });
   }
 
   async simulateRecipe(

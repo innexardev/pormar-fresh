@@ -12,9 +12,11 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   fullName     String   @map("full_name")
+  phone        String?
   role         String   @default("admin")
   active       Boolean  @default(true)
   createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("users")
 }
@@ -54,6 +56,7 @@ model Product {
   orderItems    OrderItem[]
   stockMovements StockMovement[]
   recipes       Recipe[]
+  subscriptionItems SubscriptionItem[]
 
   @@index([categoryId])
   @@map("products")
@@ -77,6 +80,7 @@ model Combo {
   items       ComboItem[]
   orderItems  OrderItem[]
   recipes     Recipe[]
+  subscriptionItems SubscriptionItem[]
 
   @@map("combos")
 }
@@ -104,12 +108,14 @@ model DeliveryWindow {
   weekday        Int
   cutoffWeekday  Int      @map("cutoff_weekday")
   cutoffHour     Int      @default(18) @map("cutoff_hour")
+  orderDeadlineDaysBefore Int @default(1) @map("order_deadline_days_before")
   active         Boolean  @default(true)
   sortOrder      Int      @default(0) @map("sort_order")
   createdAt      DateTime @default(now()) @map("created_at")
 
   orders Order[]
   productionPlans ProductionPlan[]
+  subscriptions Subscription[]
 
   @@map("delivery_windows")
 }
@@ -186,8 +192,11 @@ model Customer {
   name      String
   phone     String   @unique
   email     String?
+  lastEngagementReminderAt DateTime? @map("last_engagement_reminder_at")
   createdAt DateTime @default(now()) @map("created_at")
   orders    Order[]
+  subscriptions Subscription[]
+  supportTickets SupportTicket[]
 
   @@map("customers")
 }
@@ -201,17 +210,24 @@ model Order {
   subtotal         Decimal  @default(0) @db.Decimal(10, 2)
   deliveryFee      Decimal  @default(0) @map("delivery_fee") @db.Decimal(10, 2)
   discount         Decimal  @default(0) @db.Decimal(10, 2)
+  promoCode        String?  @map("promo_code")
+  subscriptionId   String?  @map("subscription_id")
   total            Decimal  @default(0) @db.Decimal(10, 2)
   addressJson      Json     @map("address_json")
   notes            String?
+  deliveryProofUrl String?  @map("delivery_proof_url")
+  deliveryCompletedAt DateTime? @map("delivery_completed_at")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   customer       Customer       @relation(fields: [customerId], references: [id])
   deliveryWindow DeliveryWindow @relation(fields: [deliveryWindowId], references: [id])
+  subscription   Subscription?  @relation(fields: [subscriptionId], references: [id])
   items          OrderItem[]
   payments       Payment[]
   statusHistory  OrderStatusHistory[]
+  supportTickets SupportTicket[]
+  checklistItems OrderChecklistItem[]
 
   @@index([status])
   @@index([deliveryDate])
@@ -293,8 +309,100 @@ model StoreSettings {
   heroImageUrl    String? @map("hero_image_url")
   heroFallbackUrls Json?  @map("hero_fallback_urls")
   homeCardsJson   Json?   @map("home_cards_json")
+  adminNotifyPhone1 String? @map("admin_notify_phone_1")
+  adminNotifyPhone2 String? @map("admin_notify_phone_2")
+  adminNotifyEventsJson Json? @map("admin_notify_events_json")
+  inactivityReminderDays Int @default(14) @map("inactivity_reminder_days")
+  inactivityReminderEnabled Boolean @default(true) @map("inactivity_reminder_enabled")
+  depotAddressJson Json?   @map("depot_address_json")
+  depotLat         Decimal? @map("depot_lat") @db.Decimal(10, 7)
+  depotLng         Decimal? @map("depot_lng") @db.Decimal(10, 7)
+  driverPinHash    String?  @map("driver_pin_hash")
 
   @@map("store_settings")
+}
+
+model DeliveryZone {
+  id            String   @id @default(uuid())
+  label         String
+  zipPrefixes   Json     @default("[]") @map("zip_prefixes")
+  neighborhoods Json?    @map("neighborhoods")
+  deliveryFee   Decimal  @map("delivery_fee") @db.Decimal(10, 2)
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("delivery_zones")
+}
+
+model PromoCode {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  discountType  String    @map("discount_type")
+  discountValue Decimal   @map("discount_value") @db.Decimal(10, 2)
+  minOrderValue Decimal?  @map("min_order_value") @db.Decimal(10, 2)
+  active        Boolean   @default(true)
+  expiresAt     DateTime? @map("expires_at")
+  usesCount     Int       @default(0) @map("uses_count")
+  maxUses       Int?      @map("max_uses")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@map("promo_codes")
+}
+
+model DeliveryBlock {
+  id        String   @id @default(uuid())
+  blockDate DateTime @unique @map("block_date") @db.Date
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("delivery_blocks")
+}
+
+model Subscription {
+  id               String   @id @default(uuid())
+  customerId       String   @map("customer_id")
+  deliveryWindowId String   @map("delivery_window_id")
+  status           String   @default("active")
+  addressJson      Json     @map("address_json")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  customer       Customer           @relation(fields: [customerId], references: [id])
+  deliveryWindow DeliveryWindow     @relation(fields: [deliveryWindowId], references: [id])
+  items          SubscriptionItem[]
+  orders         Order[]
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model SubscriptionItem {
+  id             String  @id @default(uuid())
+  subscriptionId String  @map("subscription_id")
+  comboId        String? @map("combo_id")
+  productId      String? @map("product_id")
+  itemName       String  @map("item_name")
+  quantity       Decimal @db.Decimal(10, 3)
+  unitLabel      String  @map("unit_label")
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  combo        Combo?       @relation(fields: [comboId], references: [id])
+  product      Product?     @relation(fields: [productId], references: [id])
+
+  @@index([subscriptionId])
+  @@map("subscription_items")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  endpoint  String   @unique
+  keysJson  Json     @map("keys_json")
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("push_subscriptions")
 }
 
 // --- Pomar Fresh: modulo de custo e preco ---
@@ -330,6 +438,8 @@ model Ingredient {
 model IngredientPurchase {
   id               String    @id @default(uuid())
   ingredientId     String    @map("ingredient_id")
+  supplierId       String?   @map("supplier_id")
+  invoiceId        String?   @map("invoice_id")
   supplier         String?
   purchaseDate     DateTime  @map("purchase_date") @db.Date
   pricePaid        Decimal   @map("price_paid") @db.Decimal(10, 2)
@@ -341,10 +451,13 @@ model IngredientPurchase {
   notes            String?
   createdAt        DateTime  @default(now()) @map("created_at")
 
-  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  ingredient Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  supplierRef Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  invoice     PurchaseInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([ingredientId])
   @@index([purchaseDate])
+  @@index([supplierId])
   @@map("ingredient_purchases")
 }
 
@@ -464,4 +577,169 @@ model IngredientStockMovement {
 
   @@index([ingredientId])
   @@map("ingredient_stock_movements")
+}
+
+// --- Fornecedores, WhatsApp, OTP, Notas fiscais ---
+
+model Supplier {
+  id           String   @id @default(uuid())
+  legalName    String   @map("legal_name")
+  tradeName    String?  @map("trade_name")
+  cnpj         String?  @unique
+  phone        String?
+  email        String?
+  contactName  String?  @map("contact_name")
+  categories   String[] @default([])
+  paymentTerms String?  @map("payment_terms")
+  notes        String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  purchases IngredientPurchase[]
+  invoices  PurchaseInvoice[]
+
+  @@map("suppliers")
+}
+
+model PurchaseInvoice {
+  id          String    @id @default(uuid())
+  supplierId  String?   @map("supplier_id")
+  number      String?
+  series      String?
+  accessKey   String?   @unique @map("access_key")
+  issueDate   DateTime? @map("issue_date") @db.Date
+  totalAmount Decimal?  @map("total_amount") @db.Decimal(10, 2)
+  fileUrl     String?   @map("file_url")
+  fileType    String?   @map("file_type")
+  status      String    @default("pending")
+  rawData     Json?     @map("raw_data")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  supplier  Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  purchases IngredientPurchase[]
+
+  @@index([status])
+  @@map("purchase_invoices")
+}
+
+model MessageTemplate {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  label     String
+  body      String
+  category  String   @default("transactional")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("message_templates")
+}
+
+model WhatsappMessageLog {
+  id          String   @id @default(uuid())
+  phone       String
+  templateKey String?  @map("template_key")
+  body        String
+  status      String   @default("sent")
+  orderId     String?  @map("order_id")
+  error       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([phone])
+  @@index([createdAt])
+  @@map("whatsapp_message_logs")
+}
+
+model OtpSession {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  attempts  Int      @default(0)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([phone])
+  @@map("otp_sessions")
+}
+
+model BotMenuOption {
+  id                  String   @id @default(uuid())
+  trigger             String
+  label               String
+  responseText        String?  @map("response_text")
+  responseTemplateKey String?  @map("response_template_key")
+  action              String?
+  sortOrder           Int      @default(0) @map("sort_order")
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@unique([trigger])
+  @@map("bot_menu_options")
+}
+
+model SupportTicket {
+  id           String   @id @default(uuid())
+  customerId   String?  @map("customer_id")
+  phone        String
+  customerName String?  @map("customer_name")
+  subject      String
+  category     String   @default("general")
+  status       String   @default("open")
+  priority     String   @default("normal")
+  orderId      String?  @map("order_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  resolvedAt   DateTime? @map("resolved_at")
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  order    Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  messages SupportMessage[]
+
+  @@index([status])
+  @@index([phone])
+  @@index([createdAt])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id        String   @id @default(uuid())
+  ticketId  String   @map("ticket_id")
+  direction String
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("support_messages")
+}
+
+model DriverLiveState {
+  id            String   @id @default("default")
+  lat           Decimal? @db.Decimal(10, 7)
+  lng           Decimal? @db.Decimal(10, 7)
+  activeOrderId String?  @map("active_order_id")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("driver_live_state")
+}
+
+model OrderChecklistItem {
+  id        String    @id @default(uuid())
+  orderId   String    @map("order_id")
+  itemIndex Int       @map("item_index")
+  itemName  String    @map("item_name")
+  quantity  Decimal   @db.Decimal(10, 3)
+  unitLabel String    @map("unit_label")
+  checked   Boolean   @default(false)
+  checkedAt DateTime? @map("checked_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, itemIndex])
+  @@map("order_checklist_items")
 }

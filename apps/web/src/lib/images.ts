@@ -54,5 +54,19 @@ export function sanitizeImageUrl(url: string | null | undefined, fallback: strin
   for (const id of BROKEN) {
     if (url.includes(id)) return fallback;
   }
-  return url;
+  return withMediaCacheBust(url);
+}
+
+/** Contorna 403 em cache da CDN para arquivos MinIO. */
+export function withMediaCacheBust(url: string): string {
+  if (!url.includes('/media/pomar-fresh/')) return url;
+  try {
+    const parsed = new URL(url);
+    if (!parsed.searchParams.has('t')) {
+      parsed.searchParams.set('t', 'v2');
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }

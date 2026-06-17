@@ -1,7 +1,9 @@
 {
   "name": "fresh-box-online",
   "private": true,
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:admin\"",
     "dev:api": "npm run dev --workspace=@freshbox/api",
@@ -10,9 +12,12 @@
     "db:generate": "npm run prisma:generate --workspace=@freshbox/api",
     "db:migrate": "npm run prisma:migrate --workspace=@freshbox/api",
     "db:seed": "npm run prisma:seed --workspace=@freshbox/api",
-    "docker:up": "docker compose up -d"
+    "docker:up": "docker compose up -d",
+    "build": "npm run build --workspace=@freshbox/api && npm run build --workspace=@freshbox/web && npm run build --workspace=@freshbox/admin",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "concurrently": "^9.1.2"
   }
 }
